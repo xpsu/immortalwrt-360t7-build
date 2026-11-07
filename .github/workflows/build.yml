@@ -55,6 +55,12 @@ jobs:
         run: |
           sudo bash -c 'bash <(curl -fsSL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
 
+      - name: 更新 feeds
+        run: |
+          cd src
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
       - name: 缓存 dl 与 ccache
         uses: actions/cache@v4
         with:
@@ -83,6 +89,14 @@ jobs:
 
           make defconfig
 
+      - name: 应用自定义文件（Argon 默认主题）
+        run: |
+          mkdir -p src/files
+          cp -r files/. src/files/
+          find src/files/etc/uci-defaults -type f -exec chmod +x {} \;
+          echo "已注入:"
+          find src/files -type f
+
       - name: 校验配置
         run: |
           cd src
@@ -92,8 +106,8 @@ jobs:
           echo "=========== 选中的设备 ==========="
           grep -E '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_[^=]+=y$' .config || true
 
-          echo "=========== 无线 / 插件 ==========="
-          grep -E '^CONFIG_(MTK_MT_WIFI|PACKAGE_kmod-mt_wifi|PACKAGE_mtwifi-cfg|PACKAGE_luci-app-mtwifi-cfg|PACKAGE_luci-app-upnp|PACKAGE_luci-app-ksmbd|PACKAGE_luci-app-ttyd|PACKAGE_luci-app-turboacc-mtk|PACKAGE_luci-app-eqos-mtk|PACKAGE_luci-app-wrtbwmon)' .config || true
+          echo "=========== 无线 / 插件 / 主题 ==========="
+          grep -E '^CONFIG_(MTK_MT_WIFI|PACKAGE_kmod-mt_wifi|PACKAGE_mtwifi-cfg|PACKAGE_luci-app-mtwifi-cfg|PACKAGE_luci-app-upnp|PACKAGE_luci-app-ksmbd|PACKAGE_luci-app-ttyd|PACKAGE_luci-app-turboacc-mtk|PACKAGE_luci-app-eqos-mtk|PACKAGE_luci-app-wrtbwmon|PACKAGE_luci-theme-argon|PACKAGE_luci-app-argon-config|PACKAGE_luci=y)' .config || true
 
           echo "=========== 断言 ==========="
           if ! grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y$' .config; then
@@ -116,6 +130,14 @@ jobs:
           fi
           if ! grep -q '^CONFIG_PACKAGE_kmod-mt_wifi=y$' .config; then
             echo "::error::闭源 mt_wifi 驱动缺失"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_PACKAGE_luci-theme-argon=y$' .config; then
+            echo "::error::Argon 主题缺失"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_PACKAGE_luci=y$' .config; then
+            echo "::error::LuCI 缺失（feeds 没装好？）"
             exit 1
           fi
           echo "配置校验通过 ✅"

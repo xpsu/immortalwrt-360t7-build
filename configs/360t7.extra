@@ -12,11 +12,16 @@ CONFIG_TARGET_PER_DEVICE_ROOTFS=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y
 CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_qihoo_360t7=""
 
+# ---- 主题：Argon（去掉默认的 bootstrap-mod）----
+# CONFIG_PACKAGE_luci-theme-bootstrap-mod is not set
+CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_luci-app-argon-config=y
+CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
+
 # ---- 插件调整：不要 ksmbd，加 upnp ----
 # CONFIG_PACKAGE_luci-app-ksmbd is not set
 # CONFIG_PACKAGE_ksmbd-server is not set
 CONFIG_PACKAGE_luci-app-upnp=y
-CONFIG_PACKAGE_luci-app-package-manager=y
 
 # ---- 编译加速 ----
 CONFIG_CCACHE=y

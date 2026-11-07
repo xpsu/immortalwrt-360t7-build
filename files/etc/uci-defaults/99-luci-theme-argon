@@ -1,0 +1,8 @@
+#!/bin/sh
+# 把默认 LuCI 主题设为 Argon
+uci -q batch <<-EOF
+	set luci.themes.Argon='/luci-static/argon'
+	set luci.main.mediaurlbase='/luci-static/argon'
+	commit luci
+EOF
+exit 0

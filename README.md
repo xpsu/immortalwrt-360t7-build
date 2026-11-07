@@ -12,7 +12,7 @@
 | 设备 | `qihoo_360t7`（UBI @0x580000，108MB 布局） |
 | 无线 | 闭源 `mt_wifi` + `mtkhnat` 硬件加速 |
 | 插件 | 上游 defconfig 全套，**去掉 ksmbd，加上 upnp** |
-| 主题 | `luci-theme-bootstrap-mod` |
+| 主题 | **Argon**（`luci-theme-argon` + `luci-app-argon-config`，默认主题已通过 uci-defaults 固定） |
 
 ## 触发
 
