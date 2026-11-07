@@ -1,0 +1,161 @@
+name: Build ImmortalWrt 360T7
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只校验配置，不编译（约 8 分钟）'
+        type: boolean
+        default: false
+  push:
+    paths:
+      - 'configs/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_REPO: https://github.com/padavanonly/immortalwrt-mt798x-6.6.git
+  SOURCE_BRANCH: openwrt-24.10-6.6
+  SOURCE_COMMIT: ec9ef10
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+
+    steps:
+      - name: 释放 runner 磁盘
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: 检出配置仓库
+        uses: actions/checkout@v4
+
+      - name: 拉取源码
+        run: |
+          git clone --depth 1 -b "$SOURCE_BRANCH" "$SOURCE_REPO" src
+          cd src
+          HEAD_SHA=$(git rev-parse --short HEAD)
+          if [ "$HEAD_SHA" != "$SOURCE_COMMIT" ]; then
+            echo "分支 HEAD 是 $HEAD_SHA，切换到锁定提交 $SOURCE_COMMIT"
+            git fetch --depth 1 origin "$SOURCE_COMMIT"
+            git checkout "$SOURCE_COMMIT"
+          fi
+          echo "源码提交: $(git rev-parse --short HEAD)"
+
+      - name: 安装编译依赖
+        run: |
+          sudo bash -c 'bash <(curl -fsSL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+
+      - name: 缓存 dl 与 ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/dl
+            ~/.ccache
+          key: owrt360t7-${{ env.SOURCE_COMMIT }}-${{ hashFiles('configs/**') }}
+          restore-keys: |
+            owrt360t7-${{ env.SOURCE_COMMIT }}-
+            owrt360t7-
+
+      - name: 生成 .config
+        run: |
+          cd src
+          # 上游 defconfig 作为基线（已含闭源 mt_wifi 驱动、LuCI、各类 MTK 工具）
+          cp defconfig/mt7981-ax3000.config .config
+
+          # 上游 defconfig 是从 21.02 仓库继承来的，含已不存在的机型（mt7981-360-t7-108M 等）
+          # 且 subtarget 符号写错成 mediatek_mt7981，这里统一修正
+          sed -i 's/^CONFIG_TARGET_mediatek_mt7981=y/CONFIG_TARGET_mediatek_filogic=y/' .config
+          sed -i '/^CONFIG_TARGET_DEVICE_/d' .config
+          sed -i '/^CONFIG_TARGET_DEVICE_PACKAGES_/d' .config
+
+          # 追加本仓库的增量配置（只选 360T7、加 upnp、去 ksmbd）
+          cat ../configs/360t7.extra >> .config
+
+          make defconfig
+
+      - name: 校验配置
+        run: |
+          cd src
+          echo "=========== 目标平台 ==========="
+          grep -E '^CONFIG_TARGET_(mediatek=y|mediatek_filogic=y|MULTI_PROFILE|PER_DEVICE_ROOTFS|PROFILE)' .config || true
+
+          echo "=========== 选中的设备 ==========="
+          grep -E '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_[^=]+=y$' .config || true
+
+          echo "=========== 无线 / 插件 ==========="
+          grep -E '^CONFIG_(MTK_MT_WIFI|PACKAGE_kmod-mt_wifi|PACKAGE_mtwifi-cfg|PACKAGE_luci-app-mtwifi-cfg|PACKAGE_luci-app-upnp|PACKAGE_luci-app-ksmbd|PACKAGE_luci-app-ttyd|PACKAGE_luci-app-turboacc-mtk|PACKAGE_luci-app-eqos-mtk|PACKAGE_luci-app-wrtbwmon)' .config || true
+
+          echo "=========== 断言 ==========="
+          if ! grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y$' .config; then
+            echo "::error::360T7 设备没有被选中，配置有问题"
+            exit 1
+          fi
+          DEVCOUNT=$(grep -cE '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_[^=]+=y$' .config)
+          echo "选中设备数: $DEVCOUNT"
+          if [ "$DEVCOUNT" != "1" ]; then
+            echo "::error::选中了 $DEVCOUNT 个设备，预期只有 1 个"
+            exit 1
+          fi
+          if grep -q '^CONFIG_PACKAGE_luci-app-ksmbd=y$' .config; then
+            echo "::error::ksmbd 被意外选入"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_PACKAGE_luci-app-upnp=y$' .config; then
+            echo "::error::upnp 没有被选入"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_PACKAGE_kmod-mt_wifi=y$' .config; then
+            echo "::error::闭源 mt_wifi 驱动缺失"
+            exit 1
+          fi
+          echo "配置校验通过 ✅"
+
+      - name: 下载源码包
+        if: ${{ !inputs.dry_run }}
+        run: cd src && make -j$(nproc) download V=s
+
+      - name: 编译
+        if: ${{ !inputs.dry_run }}
+        run: cd src && make -j$(nproc) V=s
+
+      - name: 收集产物
+        if: ${{ !inputs.dry_run }}
+        run: |
+          mkdir -p out
+          ls -lh src/bin/targets/mediatek/filogic/ || true
+          cp src/bin/targets/mediatek/filogic/*qihoo_360t7*squashfs-sysupgrade.bin out/ \
+            || { echo "::error::没有生成 360T7 镜像"; exit 1; }
+          cp src/bin/targets/mediatek/filogic/sha256sums out/ 2>/dev/null || true
+          cp src/bin/targets/mediatek/filogic/config.buildinfo out/ 2>/dev/null || true
+          ( cd out && sha256sum * > SHA256SUMS.txt )
+          ls -lh out/
+
+      - name: 上传 artifact
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: 360t7-${{ github.run_number }}
+          path: out/
+          retention-days: 30
+
+      - name: 发布 Release
+        if: ${{ !inputs.dry_run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 360T7 build ${{ github.run_number }} (${{ env.SOURCE_COMMIT }})
+          body: |
+            源码: ${{ env.SOURCE_REPO }} @ ${{ env.SOURCE_BRANCH }} / ${{ env.SOURCE_COMMIT }}
+            设备: Qihoo 360T7 (ubi 108M layout)
+            插件: 无 ksmbd，含 upnp
+          files: out/*
