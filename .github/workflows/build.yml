@@ -84,18 +84,10 @@ jobs:
           sed -i '/^CONFIG_TARGET_DEVICE_/d' .config
           sed -i '/^CONFIG_TARGET_DEVICE_PACKAGES_/d' .config
 
-          # 追加本仓库的增量配置（只选 360T7、加 upnp、去 ksmbd）
+          # 追加本仓库的增量配置（只选 360T7、只加 upnp）
           cat ../configs/360t7.extra >> .config
 
           make defconfig
-
-      - name: 应用自定义文件（Argon 默认主题）
-        run: |
-          mkdir -p src/files
-          cp -r files/. src/files/
-          find src/files/etc/uci-defaults -type f -exec chmod +x {} \;
-          echo "已注入:"
-          find src/files -type f
 
       - name: 校验配置
         run: |
@@ -107,7 +99,7 @@ jobs:
           grep -E '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_[^=]+=y$' .config || true
 
           echo "=========== 无线 / 插件 / 主题 ==========="
-          grep -E '^CONFIG_(MTK_MT_WIFI|PACKAGE_kmod-mt_wifi|PACKAGE_mtwifi-cfg|PACKAGE_luci-app-mtwifi-cfg|PACKAGE_luci-app-upnp|PACKAGE_luci-app-ksmbd|PACKAGE_luci-app-ttyd|PACKAGE_luci-app-turboacc-mtk|PACKAGE_luci-app-eqos-mtk|PACKAGE_luci-app-wrtbwmon|PACKAGE_luci-theme-argon|PACKAGE_luci-app-argon-config|PACKAGE_luci=y)' .config || true
+          grep -E '^CONFIG_(MTK_MT_WIFI|PACKAGE_kmod-mt_wifi|PACKAGE_mtwifi-cfg|PACKAGE_luci-app-mtwifi-cfg|PACKAGE_luci-app-upnp|PACKAGE_luci-app-ksmbd|PACKAGE_luci-app-ttyd|PACKAGE_luci-app-turboacc-mtk|PACKAGE_luci-app-eqos-mtk|PACKAGE_luci-app-wrtbwmon|PACKAGE_luci-theme-argon|PACKAGE_luci-theme-bootstrap|PACKAGE_luci-app-argon-config|PACKAGE_luci=y)' .config || true
 
           echo "=========== 断言 ==========="
           if ! grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y$' .config; then
@@ -132,8 +124,12 @@ jobs:
             echo "::error::闭源 mt_wifi 驱动缺失"
             exit 1
           fi
-          if ! grep -q '^CONFIG_PACKAGE_luci-theme-argon=y$' .config; then
-            echo "::error::Argon 主题缺失"
+          if ! grep -q '^CONFIG_PACKAGE_luci-theme-bootstrap=y$' .config; then
+            echo "::error::默认主题 bootstrap 缺失"
+            exit 1
+          fi
+          if grep -q '^CONFIG_PACKAGE_luci-theme-argon=y$' .config; then
+            echo "::error::Argon 被意外选入（本次要求纯默认主题）"
             exit 1
           fi
           if ! grep -q '^CONFIG_PACKAGE_luci=y$' .config; then

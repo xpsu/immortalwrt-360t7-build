@@ -1,7 +1,7 @@
 # ============================================================
-# 360T7 专用配置增量
+# 360T7 配置增量 —— 纯上游编译，只加 UPnP
 # 基线：padavanonly/immortalwrt-mt798x-6.6 @ openwrt-24.10-6.6
-#       defconfig/mt7981-ax3000.config（已含闭源 mt_wifi 驱动）
+#       defconfig/mt7981-ax3000.config（含闭源 mt_wifi 驱动）
 # ============================================================
 
 # ---- 目标：只编 360T7 ----
@@ -12,16 +12,12 @@ CONFIG_TARGET_PER_DEVICE_ROOTFS=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_qihoo_360t7=y
 CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_qihoo_360t7=""
 
-# ---- 主题：Argon（去掉默认的 bootstrap-mod）----
-# CONFIG_PACKAGE_luci-theme-bootstrap-mod is not set
-CONFIG_PACKAGE_luci-theme-argon=y
-CONFIG_PACKAGE_luci-app-argon-config=y
-CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
+# ---- 唯一的插件：UPnP ----
+CONFIG_PACKAGE_luci-app-upnp=y
 
-# ---- 插件调整：不要 ksmbd，加 upnp ----
+# ---- 保险：确保不拉 ksmbd（上游 defconfig 本来也没有）----
 # CONFIG_PACKAGE_luci-app-ksmbd is not set
 # CONFIG_PACKAGE_ksmbd-server is not set
-CONFIG_PACKAGE_luci-app-upnp=y
 
 # ---- 编译加速 ----
 CONFIG_CCACHE=y
