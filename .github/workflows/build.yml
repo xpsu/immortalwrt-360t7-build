@@ -116,8 +116,8 @@ jobs:
             echo "::error::ksmbd 被意外选入"
             exit 1
           fi
-          if ! grep -q '^CONFIG_PACKAGE_luci-app-upnp=y$' .config; then
-            echo "::error::upnp 没有被选入"
+          if grep -q '^CONFIG_PACKAGE_luci-app-upnp=y$' .config; then
+            echo "::error::upnp 被意外选入（本次要求零插件）"
             exit 1
           fi
           if ! grep -q '^CONFIG_PACKAGE_kmod-mt_wifi=y$' .config; then
@@ -128,8 +128,12 @@ jobs:
             echo "::error::默认主题 bootstrap 缺失"
             exit 1
           fi
-          if grep -q '^CONFIG_PACKAGE_luci-theme-argon=y$' .config; then
-            echo "::error::Argon 被意外选入（本次要求纯默认主题）"
+          if ! grep -q '^CONFIG_PACKAGE_luci-theme-argon=y$' .config; then
+            echo "::error::Argon 主题缺失"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_PACKAGE_luci-app-argon-config=y$' .config; then
+            echo "::error::Argon 设置页（argon-config）缺失"
             exit 1
           fi
           if ! grep -q '^CONFIG_PACKAGE_luci=y$' .config; then

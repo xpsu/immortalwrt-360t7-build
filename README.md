@@ -11,8 +11,8 @@
 | 锁定提交 | `ec9ef10` |
 | 设备 | `qihoo_360t7`（UBI @0x580000，108MB 布局） |
 | 无线 | 闭源 `mt_wifi` + `mtkhnat` 硬件加速 |
-| 插件 | 上游 defconfig 全套，**只额外加 upnp**（不含 ksmbd） |
-| 主题 | **上游默认 bootstrap**（未安装 Argon） |
+| 插件 | 上游 defconfig 全套，**不额外安装任何插件**（无 upnp、无 ksmbd） |
+| 主题 | **Argon**（`luci-theme-argon` + `luci-app-argon-config`） |
 
 ## 触发
 
